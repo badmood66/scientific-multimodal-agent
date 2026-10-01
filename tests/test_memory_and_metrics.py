@@ -1,5 +1,6 @@
 from scimultimodal_agent.agent.memory import extract_json_object
 from scimultimodal_agent.agent.verifier import answers_match
+from scimultimodal_agent.evaluation.metrics import rouge_l_f1, token_f1
 
 
 def test_extracts_json_from_fenced_output() -> None:
@@ -17,3 +18,9 @@ def test_relaxed_numeric_match() -> None:
     assert answers_match("104", "100", tolerance=0.05)
     assert not answers_match("110", "100", tolerance=0.05)
     assert answers_match("10%", "10%")
+
+
+def test_text_overlap_metrics() -> None:
+    assert token_f1("blue solid line", "the blue line") > 0.6
+    assert rouge_l_f1("blue solid line", "the blue line") > 0.6
+    assert token_f1("red", "blue") == 0.0

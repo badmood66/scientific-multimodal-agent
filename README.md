@@ -1,13 +1,13 @@
-# Evidence-Grounded Multimodal Agent for Scientific Chart Reasoning
+# Evidence-Grounded Multimodal Agent for Scientific Figure Reasoning
 
 A reproducible research prototype that turns a compact local vision-language model into an
-auditable chart-reasoning agent. The system plans a question, extracts question-specific visual
+auditable scientific-figure reasoning agent. The system plans a question, extracts question-specific visual
 evidence into structured memory, invokes a safe arithmetic tool when appropriate, and calibrates
 the final answer with an evidence verifier.
 
-The project is designed as a bridge between **multimodal foundation models**, **tool-using agents**,
-and **AI for Science**. It currently evaluates chart reasoning on ChartQA; scientific plots and
-multi-panel figures are natural extensions, not claimed as completed results.
+The project bridges **multimodal foundation models**, **tool-using agents**, and **AI for Science**.
+It evaluates both conventional chart reasoning on ChartQA and real scientific-paper figures from
+SciVQA, including multi-panel plots, confusion matrices, architecture diagrams, and networks.
 
 ## Why this project
 
@@ -26,7 +26,8 @@ flowchart LR
     T --> A
     M --> V[Evidence verifier]
     A --> V
-    V --> O[Answer + confidence + trace]
+    V --> C[Cross-route consensus verifier]
+    C --> O[Answer + confidence + trace]
 ```
 
 ## Main contributions
@@ -40,8 +41,27 @@ flowchart LR
 - Baselines and ablations: `direct`, `cot`, `full`, `no_memory`, `no_tools`, and `no_verifier`.
 - Accuracy, relaxed numeric accuracy, tool success, verification coverage, latency, and expected
   calibration error (ECE).
+- Exact match, Token-F1, and ROUGE-L for open scientific-figure answers.
 
-## Pilot results
+## Results
+
+### Real scientific-paper figures: SciVQA-100
+
+One hundred distinct validation figures were sampled with one question per image and balanced
+across binary, finite non-binary, and open-answer visual questions.
+
+| Method | Accuracy | Token-F1 | ROUGE-L F1 | Mean latency |
+|---|---:|---:|---:|---:|
+| Direct VLM | 51.0% | 0.597 | 0.594 | 0.28 s |
+| Chain-of-thought | 51.0% | 0.570 | 0.570 | 2.92 s |
+| Full agent | **57.0%** | **0.643** | **0.640** | 4.81 s |
+
+Removing structured memory returns accuracy to 51%. Removing arithmetic tools does not change
+SciVQA accuracy, showing that this subset is limited by spatial and relational grounding rather
+than arithmetic. A three-route consensus verifier covers 50% of samples at 72% selective accuracy.
+See [`reports/scivqa_experiment.md`](reports/scivqa_experiment.md).
+
+### Statistical charts: ChartQA-50
 
 Fifty seeded, balanced samples from the ChartQA test split were evaluated with frozen
 `Qwen/Qwen3-VL-2B-Instruct` on an 8 GB RTX 4060 Laptop GPU.
@@ -71,6 +91,7 @@ $env:HF_HOME = "D:\ResearchData\hf_cache"
 $env:HF_HUB_CACHE = "D:\ResearchData\hf_cache\hub"
 
 python scripts\run_benchmark.py --samples 50 --modes direct cot full
+python scripts\run_scivqa_benchmark.py --samples 100 --modes direct cot full
 python scripts\summarize_results.py reports\chartqa_full_n50.jsonl
 ```
 
@@ -83,12 +104,13 @@ traces are intentionally excluded from Git.
 configs/                         Experiment configuration
 src/scimultimodal_agent/
   agent/                         Planner, memory, tools, verifier, orchestration
-  data/                          ChartQA download and materialization
+  data/                          ChartQA and SciVQA adapters and materialization
   evaluation/                    Metrics and trace runner
   models/                        Local Qwen3-VL inference adapter
 scripts/                         Download, benchmark, and reporting entry points
 tests/                           Unit and integration tests with a fake VLM backend
 reports/pilot_experiment.md      Reproducible pilot results and error analysis
+reports/scivqa_experiment.md     Scientific-figure results and component ablations
 ```
 
 ## Evaluation protocol
@@ -107,12 +129,12 @@ python -m ruff check .
 
 ## Limitations and next steps
 
-Arithmetic remains the principal bottleneck: the full agent scored 43.8% on 16 arithmetic questions
-but 100% on count and comparison questions in the pilot. The most useful next steps are:
+Arithmetic remains the principal ChartQA bottleneck, while fine-grained spatial grounding and
+multi-option composition dominate SciVQA errors. The most useful next steps are:
 
 1. region-level chart grounding before value extraction;
 2. uncertainty-aware tool invocation and abstention;
-3. evaluation on scientific plots and multi-panel figures;
+3. evaluation on a larger SciVQA subset and SPIQA test-A;
 4. a full ChartQA run with bootstrap confidence intervals;
 5. comparison with OCR/table-reconstruction and stronger VLM baselines.
 
@@ -122,8 +144,9 @@ but 100% on count and comparison questions in the pilot. The most useful next st
   Logical Reasoning](https://aclanthology.org/2022.findings-acl.177/), Findings of ACL 2022.
 - Qwen Team. [Qwen3-VL-2B-Instruct model card](https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct).
 - Yao et al. [DoraemonGPT: Toward Understanding Dynamic Scenes with Large Language Models](https://arxiv.org/abs/2401.08392), 2024.
+- Ekaterina Borisova et al. [SciVQA 2025: Overview of the First Scientific Visual Question
+  Answering Shared Task](https://aclanthology.org/2025.sdp-1.18/), SDP 2025.
 
 ## License
 
 MIT. ChartQA and Qwen3-VL remain subject to their respective licenses and terms.
-

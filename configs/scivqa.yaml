@@ -1,0 +1,25 @@
+seed: 42
+dataset:
+  repo_id: katebor/SciVQA
+  split: validation
+  max_samples: 100
+  sample_strategy: balanced
+  visual_only: true
+  unique_figures: true
+model:
+  model_id: Qwen/Qwen3-VL-2B-Instruct
+  dtype: bfloat16
+  max_new_tokens: 256
+  max_pixels: 786432
+  device: cuda
+agent:
+  mode: full
+  enable_calculator: true
+  enable_structured_memory: true
+  enable_verifier: true
+evaluation:
+  metrics:
+    - exact_match
+    - token_f1
+    - rouge_l_f1
+  save_traces: true

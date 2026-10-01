@@ -47,8 +47,21 @@ def test_conflicting_tool_does_not_override_numeric_candidate() -> None:
         [{"success": True, "output": 74.0}],
         "number",
         "What is the average?",
+        False,
     )
     assert result == "30"
+
+
+def test_multiple_choice_prefers_valid_memory_letter() -> None:
+    result = ScientificChartAgent._resolve_answer(
+        "B",
+        {"answer_candidate": "A"},
+        [],
+        "label_or_concept",
+        "Which line is highest?",
+        True,
+    )
+    assert result == "A"
 
 
 def test_direct_baseline_is_single_call() -> None:

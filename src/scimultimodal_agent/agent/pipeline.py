@@ -46,6 +46,18 @@ def expected_answer_type(question: str) -> str:
     return "short_text_or_number"
 
 
+def sample_context(sample: ChartSample) -> str:
+    parts = []
+    if sample.caption:
+        parts.append(f"Figure caption: {sample.caption}")
+    if sample.answer_options:
+        parts.append(
+            "Answer options (return only the correct option letter or comma-separated letters): "
+            + "; ".join(sample.answer_options)
+        )
+    return "\n".join(parts)
+
+
 class ScientificChartAgent:
     MODES: ClassVar[set[str]] = {
         "direct",
@@ -102,6 +114,7 @@ class ScientificChartAgent:
                 trace.tool_calls,
                 answer_type,
                 sample.question,
+                bool(sample.answer_options),
             )
             if mode != "no_verifier":
                 result = self.verifier.verify(trace.prediction, memory, trace.tool_calls)
@@ -123,27 +136,32 @@ class ScientificChartAgent:
                 "Return one compact JSON object with keys `reasoning` and `final_answer`; "
                 "the final answer must be short. Do not use markdown.\n"
                 f"Expected answer type: {expected_answer_type(sample.question)}\n"
+                f"{sample_context(sample)}\n"
                 f"Question: {sample.question}"
             )
         else:
             prompt = (
-                "Answer the chart question using only the image. Return only the short answer, "
+                "Answer the scientific-figure question using the image and supplied caption. "
+                "Return only the short answer, "
                 "without explanation.\n"
+                f"{sample_context(sample)}\n"
                 f"Question: {sample.question}"
             )
         return clean_short_answer(self.backend.generate(sample.image_path, prompt, 160))
 
     def _perceive(self, sample: ChartSample, reasoning_type: str) -> dict:
-        prompt = f"""You are the perception module of a scientific-chart reasoning agent.
+        prompt = f"""You are the perception module of a scientific-figure reasoning agent.
 Question: {sample.question}
 Planned reasoning type: {reasoning_type}
 Expected answer type: {expected_answer_type(sample.question)}
+{sample_context(sample)}
 
 Extract only evidence strictly needed for this question. Never transcribe or enumerate the full
-chart, even when it contains many categories. Return one compact valid JSON object under 100 words:
+figure, even when it contains many panels. Return one compact valid JSON object under 100 words:
 {{
   "answer_type": "number or label_or_concept",
-  "relevant_values": [{{"label": "at most two question-relevant labels", "value": 0, "unit": "..."}}],
+  "relevant_entities": ["at most two question-relevant labels, components, or concepts"],
+  "relevant_values": [{{"label": "at most two relevant labels", "value": 0, "unit": "..."}}],
   "visual_evidence": "one short supporting observation",
   "calculation": {{"expression": "numeric arithmetic or empty", "purpose": "short"}},
   "answer_candidate": "short answer"
@@ -161,6 +179,7 @@ label, not its numeric value. Do not infer unavailable values. Do not wrap the J
         prompt = f"""You are the answer module of a scientific-chart agent.
 Question: {sample.question}
 Expected answer type: {expected_answer_type(sample.question)}
+{sample_context(sample)}
 Structured visual memory: {compact_memory(memory)}
 Tool results: {compact_memory({"calls": tool_calls})}
 
@@ -179,11 +198,14 @@ Do not include markdown."""
         tool_calls: list[dict],
         answer_type: str,
         question: str,
+        has_answer_options: bool,
     ) -> str:
         """Resolve candidates with deterministic, auditable precedence rules."""
         successful = [call for call in tool_calls if call.get("success")]
         memory_candidate = str(memory.get("answer_candidate", "")).strip()
-        if "represent" in question.lower() and memory_candidate:
+        if has_answer_options and re.fullmatch(r"[A-D](?:\s*,\s*[A-D])*", memory_candidate):
+            return re.sub(r"\s+", "", memory_candidate)
+        if re.search(r"\brepresents? what|what does .* represent", question, re.IGNORECASE) and memory_candidate:
             return memory_candidate
         direct_number = parse_number(direct_candidate)
         if answer_type == "number" and successful and direct_number is not None:

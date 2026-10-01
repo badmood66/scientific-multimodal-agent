@@ -22,6 +22,9 @@ class ChartSample:
     question: str
     answer: str
     source_type: str
+    caption: str = ""
+    answer_options: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -60,4 +63,3 @@ class AgentTrace:
         if self.plan:
             data["plan"]["reasoning_type"] = self.plan.reasoning_type.value
         return data
-
